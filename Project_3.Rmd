@@ -1,12 +1,12 @@
 ---
-title: "Project 3"
+title: "Transportability Analysis of Prediction Model from Framingham Heart Study to NHANES data"
 author: "Han Ji"
 date: "`r Sys.Date()`"
 output: pdf_document
 csl: american-statistical-association.csl
 bibliography: references.bib
 link-citations: yes
-abstract: "Evaluating the transportability and the performance is important when applying a prediction model derived in the source population to the target population, especially when the characteristics of two populations differ. Recently, a method that uses inverse-odds weights to get transported brier score estimate has been developed. In this study, we first examine its performance when transporting a prediction model for CVD risk on Framingham Study to NHANES data, while the population in NHANES seem to be healthier than population in Framingham. The average brier score estimated from imputation are 0.0929 and 0.0563 in NHANES for men and women, compared to 0.1939 and 0.1171 for Framingham. We also conduct a simulation study to evaluate the transportability when only summary statistics of the target population are available. We use two methods, multivariate normal distribution and bootstrapping from the source population, to simulate the individual-level data based on the summary statistics of NHANES. The simulated data from the first method is well-calibrated for the mean statistics, and the other is not calibrated. Multivariate normal has a smaller relative bias (13.47% versus 38.93%) for men in brier scores, while bootstrap is slight better for women (-1.62% versus -1.46%). We conclude that the difference in the oracle and the simulated brier score seems to be associated with the difference in the source and the target brier score, and this impacts differ for different simulation methods."
+abstract: "Evaluating the transportability and the performance is important when applying a prediction model derived in the source population to the target population, especially when the characteristics of two populations differ. Recently, a method that uses inverse-odds weights to get transported brier score estimate has been developed (Steingrimsson et al. 2023). In this study, we first examine its performance when transporting a prediction model for CVD risk on Framingham Study to NHANES data, while the population in NHANES seem to be healthier than population in Framingham. The average brier score estimated from imputation are 0.0903 and 0.0474 in NHANES for men and women, compared to 0.1939 and 0.1171 for Framingham. We also conduct a simulation study to evaluate the transportability when only summary statistics of the target population are available. We use two methods, multivariate normal distribution and bootstrapping from the source population, to simulate the individual-level data based on the summary statistics of NHANES. The simulated data from the first method is well-calibrated for the mean statistics, and the other is not calibrated. Multivariate normal has a smaller relative bias (8.34% versus 45.48%) for men in brier scores, while bootstrap is comparable to Multivaraite normal for women (15.88% versus 15.2%) but with a smaller MSE. We conclude that the difference in the oracle and the simulated brier score seems to be associated with the difference in the source and the target brier score, and this impacts differ for different simulation methods."
 ---
 
 ```{r setup, include=FALSE}
@@ -21,9 +21,10 @@ knitr::opts_chunk$set(warning = FALSE)
 
 ```{r}
 library(riskCommunicator)
-library(tidyverse)
 library(tableone)
+library(MASS)
 library(mice)
+library(tidyverse)
 library(kableExtra)
 ```
 
@@ -43,19 +44,27 @@ The Framingham Heart Study is a long term prospective study of the etiology of c
 
 ### National Health and Nutrition Examination Survey
 
-National Health and Nutrition Examination Survey (NHANES) is a survey conducted by the National Center for Health Statistics (NCHS), and data are publicly available at: https://www.cdc.gov/nchs/nhanes.htm. We select the data from 2017 and 2018 and the variables present in the Framingham study model [@nhanesA]. There are 9254 observations at the beginning, and we remove the observations that don't match the age eligibility (<30 yrs) and the ones with more than 3 variables missing. There are 3726 observations left (n = 1795 for men; n = 1931 for women).
+National Health and Nutrition Examination Survey (NHANES) is a survey conducted by the National Center for Health Statistics (NCHS), and data are publicly available at: https://www.cdc.gov/nchs/nhanes.htm. We select the data from 2017 and 2018 and the variables present in the Framingham study model [@nhanesA]. There are 9254 observations at the beginning, and we remove the observations that don't match the age eligibility (<30 yrs) and the ones with more than 3 variables missing (n = 5350 for not satisfying age eligibility; n = 178 for missing variable criterion). The records with high missing proportions in variiables were removed because they might cause unstable estimates in the later multiple imputation. At the end, there are 3726 observations left (n = 1795 for men; n = 1931 for women).
 
 ### Multiple imputation
 
-We first train-test split both Framingham and NHANES data by 3:1 ratio for each sex, so the ratio between two studies are the same in train and test set. We use `mice` to conduct multiple imputation with in the NHANES train set data for each sex, and we apply the same model to the NHANES test set data. The seed used is 2550. The full train and test set is generated by combing Framinghan and NHANES data for each sex. The population indicator S is attached: S = 1 if in Framingham study and S = 0 if in NHANES.
+We train-test split Framingham data by 3:1 ratio for each sex. We use `mice` to conduct multiple imputation within the NHANES data for each sex. The seed used is 2550. BMI is included in multiple imputation though it is not used in prediction model. Only the framingham train data is used for building the prediction model, and the test set of Framingham study is combined with each complete set of NHANES data to form a composite data set for each sex. The population indicator S is attached: S = 1 if in Framingham study and S = 0 if in NHANES.
 
 ### Prediction Model
 
-The prediction model for CVD risk is based on previous studies [@heart]. We fit the logistic regression model on the Framingham train set for each sex and apply to the test set.
+The prediction model for CVD risk is based on previous studies [@heart]. We fit the logistic regression model on the Framingham train set for each sex and apply to the test set. The formula used for both sex is:
+
+$$
+\begin{aligned}
+E\left[\text{logit(CVD)}\right] =& \beta_0 + \beta_1 \cdot log(\text{HDLC}) + \beta_2 \cdot log(\text{TOTCHOL}) + \beta_3 \cdot log(\text{age}) + \\
+&\beta_4 \cdot log(\text{SYSBP\_UT+1}) + \beta_5 \cdot log(\text{SYSBP\_UT+1}) + \\
+&\beta_6 \cdot \text{CURSMOKE} + \beta_7 \cdot \text{DIABETES}
+\end{aligned}
+$$
 
 ### Transportability Analysis
 
-To avaluate the prediction performance on the target population NHANES, we use the brier score formula below [@Steingrimsson2023-og]:
+To evaluate the prediction performance on the target population NHANES, we use the brier score formula below [@Steingrimsson2023-og]:
 
 $$
 \hat \psi_{\hat \beta}= \frac{\sum_{i=1}^n I(S_i=1,D_i=1)\hat o(X_i) (Y_i - g_{\hat \beta}(X_i))^2}{\sum_{i=1}^n I(S_i=0, D_i=1)},
@@ -69,7 +78,7 @@ We simulate the individual-level data based on the summary statistics of the tar
 
 #### Aims
 
-The aim of this simulation study is to evaluate the performance of simualted data sets from summary statistics of the target population during transporability analysis. Our main consideration includes: 1) the impact of the difference between the source and target population on the performance; 2) the assumption on the target population distribution derived from the source population individual data; 3) the calibration of the simualted data set compared to the given summary statistics
+The aim of this simulation study is to evaluate the performance of simualted data sets from summary statistics of the target population during transporability analysis. Our main consideration includes: 1) the impact of the difference between the source and target population on the performance; 2) the assumption on the target population distribution derived from the source population individual data; 3) the calibration of the simulated data set compared to the given summary statistics.
 
 #### Data-generating Mechanisms:
 
@@ -77,7 +86,15 @@ We consider two mechanisms:
 
 1. Multivariate normal. Since the marginal distribution of all continuous variables in Framingham study looks normal after log, we use a multivariate normal distribution to generate samples. The mean is the log mean values from NHANES, while the covariance matrix is from Framingham since the standard deviation is hard to estimate after log. The continuous variable values are obtained by taking exponential of the simulated values, and the binary variable values are obtained by using quantiles of the simulated values and the observed proportions from NHANES.
 
-2. Bootstrap. We use normal density for continuous variables and the proportion for categorical variables using the mean and sd from NHANES to get a joint density estimate for each observation in Framingham. It represents the likelihood that this observation can belong to the NHANES study. After scaling the density to probability by dividing by the sum, we boostrap the observations from Framingham to generate a sample for the tartget population.
+2. Bootstrap. We use normal density for continuous variables and the proportion for categorical variables using the mean and standard deviation from NHANES to get a joint density estimate for each observation in Framingham. It represents the likelihood that this observation can belong to the NHANES study. It can be expressed by:
+
+$$\begin{aligned}
+&L(\mathbf{X_i}) = L(X_{TOTCHOL,\, i}) \cdot L(X_{AGE, \,i}) \cdot ..., \,\\
+&\text{where } \mathbf{X_i} \text{ is the covariate vector of observation i from Framingham data} \\
+&\text{For each covariate, } L(\cdot) \text{ is the dnorm() function in R for normal density}
+\end{aligned}$$
+
+After scaling the density to probability by dividing by the sum, we bootstrap the observations from Framingham to generate a sample for the target population.
 
 #### Estimand
 
@@ -250,17 +267,19 @@ df_2017_women <- df_2017_age %>%
 ```{r}
 # train test split 3:1
 set.seed(1)
-index_test_nhanes_men <- sample(1:nrow(df_2017_men), 
+
+# no train test split for nhanes - only for Framingham
+index_test_nhanes_men <- sample(1:nrow(df_2017_men),
                                 size = floor(nrow(df_2017_men)/4),
                                 replace = FALSE)
-train_nhanes_men <- df_2017_men[-index_test_nhanes_men, ]
-test_nhanes_men <- df_2017_men[index_test_nhanes_men, ]
-
-index_test_nhanes_women <- sample(1:nrow(df_2017_women), 
+# train_nhanes_men <- df_2017_men[-index_test_nhanes_men, ]
+# test_nhanes_men <- df_2017_men[index_test_nhanes_men, ]
+# 
+index_test_nhanes_women <- sample(1:nrow(df_2017_women),
                                   size = floor(nrow(df_2017_women)/4),
                                   replace = FALSE)
-train_nhanes_women <- df_2017_women[-index_test_nhanes_women, ]
-test_nhanes_women <- df_2017_women[index_test_nhanes_women, ]
+# train_nhanes_women <- df_2017_women[-index_test_nhanes_women, ]
+# test_nhanes_women <- df_2017_women[index_test_nhanes_women, ]
 
 index_test_framingham_men <- sample(1:nrow(framingham_df_men), 
                                     size = floor(nrow(framingham_df_men)/4),
@@ -303,17 +322,17 @@ brier_framingham_women <- (test_framingham_women$CVD -
 # imputation - 5 sets
 ## the brier score will be calculated 5 times and take average
 
-# the imputation is done within train set
-## and apply the same model to the test
-
 m <- 5
-imp.train.men <- mice(train_nhanes_men,
-                  m = m, print = FALSE, seed = 2550)
-imp.test.men <- mice.mids(imp.train.men, newdata = test_nhanes_men)
+# imp.train.men <- mice(train_nhanes_men,
+#                   m = m, print = FALSE, seed = 2550)
+# imp.test.men <- mice.mids(imp.train.men, newdata = test_nhanes_men)
+# 
+# imp.train.women <- mice(train_nhanes_women,
+#                   m = m, print = FALSE, seed = 2550)
+# imp.test.women <- mice.mids(imp.train.women, newdata = test_nhanes_women)
 
-imp.train.women <- mice(train_nhanes_women,
-                  m = m, print = FALSE, seed = 2550)
-imp.test.women <- mice.mids(imp.train.women, newdata = test_nhanes_women)
+imp.men <- mice(df_2017_men, m = m, print = FALSE, seed = 2550)
+imp.women <- mice(df_2017_women, m = m, print = FALSE, seed = 2550)
 ```
 
 ```{r, eval = F}
@@ -322,68 +341,38 @@ imp.test.women <- mice.mids(imp.train.women, newdata = test_nhanes_women)
 brier_nhanes_men <- c()
 brier_nhanes_women <- c()
 for(i in 1:m){
-  imp.train.data.men <- complete(imp.train.men, i)
-  imp.train.data.women <- complete(imp.train.women, i)
+  imp.data.men <- complete(imp.men, i)
+  imp.data.women <- complete(imp.women, i)
   
   # create the variables to match framingham
   ## for men
-  imp.train.data.men$SYSBP_UT <- ifelse(imp.train.data.men$BPMEDS == 0,
-                                  imp.train.data.men$SYSBP, 0)
-  imp.train.data.men$SYSBP_T <- ifelse(imp.train.data.men$BPMEDS == 1,
-                                  imp.train.data.men$SYSBP, 0)
-  imp.train.data.men$CVD <- NA
-  imp.train.data.men$SEX <- 1
-  imp.train.data.men <- imp.train.data.men %>% 
-    select(colnames(train_framingham_men))
+  imp.data.men$SYSBP_UT <- ifelse(imp.data.men$BPMEDS == 0,
+                                  imp.data.men$SYSBP, 0)
+  imp.data.men$SYSBP_T <- ifelse(imp.data.men$BPMEDS == 1,
+                                  imp.data.men$SYSBP, 0)
+  imp.data.men$CVD <- NA
+  imp.data.men$SEX <- 1
+  imp.data.men <- imp.data.men %>% 
+    dplyr::select(colnames(train_framingham_men))
     
   ## for women
-  imp.train.data.women$SYSBP_UT <- ifelse(imp.train.data.women$BPMEDS == 0,
-                                  imp.train.data.women$SYSBP, 0)
-  imp.train.data.women$SYSBP_T <- ifelse(imp.train.data.women$BPMEDS == 1,
-                                  imp.train.data.women$SYSBP, 0)
-  imp.train.data.women$CVD <- NA
-  imp.train.data.women$SEX <- 2
-  imp.train.data.women <- imp.train.data.women %>% 
-    select(colnames(train_framingham_women))
-  
-  imp.test.data.men <- complete(imp.test.men, i)
-  imp.test.data.women <- complete(imp.test.women, i)
-  
-  ## for men, test
-  imp.test.data.men$SYSBP_UT <- ifelse(imp.test.data.men$BPMEDS == 0,
-                                  imp.test.data.men$SYSBP, 0)
-  imp.test.data.men$SYSBP_T <- ifelse(imp.test.data.men$BPMEDS == 1,
-                                  imp.test.data.men$SYSBP, 0)
-  imp.test.data.men$CVD <- NA
-  imp.test.data.men$SEX <- 1
-  imp.test.data.men <- imp.test.data.men %>% 
-    select(colnames(test_framingham_men))
-    
-  ## for women, test
-  imp.test.data.women$SYSBP_UT <- ifelse(imp.test.data.women$BPMEDS == 0,
-                                  imp.test.data.women$SYSBP, 0)
-  imp.test.data.women$SYSBP_T <- ifelse(imp.test.data.women$BPMEDS == 1,
-                                  imp.test.data.women$SYSBP, 0)
-  imp.test.data.women$CVD <- NA
-  imp.test.data.women$SEX <- 2
-  imp.test.data.women <- imp.test.data.women %>% 
-    select(colnames(test_framingham_women))
-  
+  imp.data.women$SYSBP_UT <- ifelse(imp.data.women$BPMEDS == 0,
+                                  imp.data.women$SYSBP, 0)
+  imp.data.women$SYSBP_T <- ifelse(imp.data.women$BPMEDS == 1,
+                                  imp.data.women$SYSBP, 0)
+  imp.data.women$CVD <- NA
+  imp.data.women$SEX <- 2
+  imp.data.women <- imp.data.women %>% 
+    dplyr::select(colnames(train_framingham_women))
+
   # match the variables
-  full.train.men <- data.frame(rbind(imp.train.data.men, train_framingham_men))
-  full.train.women <- data.frame(rbind(imp.train.data.women, train_framingham_women))
-  
-  full.test.men <- data.frame(rbind(imp.test.data.men, test_framingham_men))
-  full.test.women <- data.frame(rbind(imp.test.data.women, test_framingham_women))
+  full.test.men <- data.frame(rbind(imp.data.men, test_framingham_men))
+  full.test.women <- data.frame(rbind(imp.data.women, test_framingham_women))
   
   # add the population indicator - 1 for framingham and 0 for nhanes
-  full.train.men$S <- c(rep(0, nrow(imp.train.data.men)), 
-                        rep(1, nrow(train_framingham_men)))
-  full.train.women$S <- c(rep(0, nrow(imp.train.data.women)), 
-                          rep(1, nrow(train_framingham_women)))
-  full.test.men$S <- c(rep(0, nrow(imp.test.data.men)), 
+  full.test.men$S <- c(rep(0, nrow(imp.data.men)), 
                         rep(1, nrow(test_framingham_men)))
-  full.test.women$S <- c(rep(0, nrow(imp.test.data.women)), 
+  full.test.women$S <- c(rep(0, nrow(imp.data.women)), 
                           rep(1, nrow(test_framingham_women)))
   
   # find inverse-odds weight in the test set
@@ -402,6 +391,12 @@ for(i in 1:m){
     sum(full.test.women$S == 0)
 }
 ```
+
+```{r}
+# try to calculate the AUC
+
+```
+
 
 ## Results
 
@@ -457,11 +452,11 @@ data.frame(Men = mod_men$coefficients[-1],
   kable_styling(full_width=T, latex_options = c('HOLD_position'))
 ```
 
-Table 1 summarizes the characteristics of the Framingham study stratified by sex, and it shows that the distributions differ by sex for the most of variables. Women participated in the study had a better health level as they had a lower total cholesterol, a lower percentage of smoking, and a lower BMI. Correspondingly, the proportion of being diagnosed with CVD is higher in men than women. Since these two subpopulations seem to be different, we separate them for the following analysis, though some covaraites may associate with the outcome in a similar way between women and men.
+Table 1 summarizes the characteristics of the Framingham study stratified by sex, and it shows that the distributions differ by sex for the most of variables. Women participated in the study had a better health level as they had a lower total cholesterol, a lower percentage of smoking, and a lower BMI. Correspondingly, the proportion of being diagnosed with CVD is higher in men than women. Since these two sub-populations seem to be different, we separate them for the following analysis, though some covariates may associate with the outcome in a similar way between women and men.
 
-We fit a logistic regression model on the subset for each sex, and the model coefficients are shown in Table 2. All continuous variables are transformed to the natural log scale because. All variables included are significant (p \< 0.05) except smoking status in men (p = 0.07). The overall trend in the coefficients is similar between men and women but there are still subtle differences: the smoking status is more important for women than men. For women, if the increase in total cholesterol is mainly HDLC, it is still beneficial for CVD risk; however, for men, any increase in total cholesterol is harmful on the population level.
+We fit a logistic regression model on the subset for each sex, and the model coefficients are shown in Table 3. All continuous variables are transformed to the natural log scale because. All variables included are significant (p \< 0.05) except smoking status in men (p = 0.07). The overall trend in the coefficients is similar between men and women but there are still subtle differences: the smoking status is more important for women than men. For women, if the increase in total cholesterol is mainly HDLC, it is still beneficial for CVD risk; however, for men, any increase in total cholesterol is harmful on the population level.
 
-Now we want to transport the prediction model from the Framingham study to the NHANES study, while the outcome variable is missing (Table 2). We first train-test split the Framninghan and NHANES data seperately for each sex with the ratio 3:1, so the ratio between two studies are the same between the train and test set for each sex. Multiple imputation is conducted to generate 5 complete set for train and test set, and the final brier scores are calculated for each imputation.
+Now we want to transport the prediction model from the Framingham study to the NHANES study, while the outcome variable is missing (Table 2). The model is built on the Framingham train set, and multiple imputation is conducted to generate 5 complete set for NHANES data. The final brier scores are calculated for each imputation.
 
 ```{r, eval = FALSE}
 # table of brier scores
@@ -473,6 +468,8 @@ df_brier_score <- data.frame(Imputation = c(1:5, "Avg.", "Source"),
 df_score_weight <- data.frame(AGE = test_framingham_men$AGE, 
                               log_weight = log(weight_men), 
                               BS = brier_framingham_men)
+saveRDS(df_brier_score, "df_brier_score.RDS")
+saveRDS(df_score_weight, "df_score_weight.RDS")
 ```
 
 ```{r, include = TRUE}
@@ -502,7 +499,7 @@ ggplot(data = df_score_weight) +
        color = "Brier Score")
 ```
 
-Table 4 shows the summary table of brier scores. The average for NHANES is 0.0929 and 0.0563 for men and women, respectively, and both are lower than Framingham, 0.1939 and 0.1171. The transported brier scores vary among multiple imputations but all are close the mean values, meaning the inverse-odds weight estimates tend to be stable overall. We also look at what causes the obvious decrease in the brier scores. We plot the inverse-odds weight, age, and the brier score components of each observation from the framingham test set based on one imputation result (Figure 1). The points tend to have a higher brier score when age increases, meaning the prediction accuracy decreases when age increases. On the other hand, we see the overall inverse-odds weight decreases when age increases, meaning the effect of the corresponding component is less on the brier score as age increases. The ones with a brier score lower than average has a weight higher than 1, and the ones with a higher brier score has a smaller weight, and thus the resulting brier score is lower in NHANES. This means that the observations with a smaller age have a higher prediction accuracy, which implies the health level may be associated with the prediction accuracy. This is also reflected in the summary characteristics that the population in NHANES is more healthy than Framingham overall. However, this trend is not obvious in other predictors. Another reason could be that the prediction on the younger population is easier given other covaraites, while it is more complex for the elder population.
+Table 4 shows the summary table of brier scores. The average for NHANES is 0.0903 and 0.0474 for men and women, respectively, and both are lower than Framingham, 0.1939 and 0.1171. The transported brier scores vary among multiple imputations but all are close the mean values, meaning the inverse-odds weight estimates tend to be stable overall. We also look at what causes the obvious decrease in the brier scores. We plot the inverse-odds weight, age, and the brier score components of each observation from the framingham test set based on one imputation result (Figure 1). The points tend to have a higher brier score when age increases, meaning the prediction accuracy decreases when age increases. On the other hand, we see the overall inverse-odds weight decreases when age increases, meaning the effect of the corresponding component is less on the brier score as age increases. The ones with a brier score lower than average has a weight higher than 1, and the ones with a higher brier score has a smaller weight, and thus the resulting brier score is lower in NHANES. This means that the observations with a smaller age have a higher prediction accuracy, which implies the health level may be associated with the prediction accuracy. This is also reflected in the summary characteristics that the population in NHANES is more healthy than Framingham overall. However, this trend is not obvious in other predictors. Another reason could be that the prediction on the younger population is easier given other covariates, while it is more complex for the elder population.
 
 ```{r, eval = FALSE}
 # Simulation
@@ -588,9 +585,9 @@ for (i in 1:1000) {
   MN_sample_sd_men[i,] <- apply(MN_sample_men[, c(1:3, 7:8)], 2, sd)
   
   # form the new test set
-  full.sim.test.men <- rbind(MN_sample_men[index_test_nhanes_men, ],
+  full.sim.test.men <- rbind(MN_sample_men,
                            test_framingham_men[, 3:12])
-  full.sim.test.men$S <- c(rep(0, length(index_test_nhanes_men)),
+  full.sim.test.men$S <- c(rep(0, nrow(df_2017_men)),
                            rep(1, nrow(test_framingham_men)))
   
   mod_weight_sim_men <- glm(S ~ log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+
@@ -610,9 +607,9 @@ for (i in 1:1000) {
   MN_sample_sd_women[i,] <- apply(MN_sample_women[, c(1:3, 7:8)], 2, sd)
   
   # form the new test set
-  full.sim.test.women <- rbind(MN_sample_women[index_test_nhanes_women, ],
+  full.sim.test.women <- rbind(MN_sample_women,
                            test_framingham_women[, 3:12])
-  full.sim.test.women$S <- c(rep(0, length(index_test_nhanes_women)),
+  full.sim.test.women$S <- c(rep(0, nrow(df_2017_women),),
                            rep(1, nrow(test_framingham_women)))
   
   mod_weight_sim_women <- glm(S ~ log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+
@@ -723,9 +720,9 @@ for (i in 1:1000) {
   bootstrap_sample_sd_men[i,] <- apply(bootstrap_sample_men[, c(1:3, 7:8)], 2, sd)
   
   # form the new test set
-  full.sim.test.men <- rbind(bootstrap_sample_men[index_test_nhanes_men, ],
+  full.sim.test.men <- rbind(bootstrap_sample_men,
                            test_framingham_men[, 3:12])
-  full.sim.test.men$S <- c(rep(0, length(index_test_nhanes_men)),
+  full.sim.test.men$S <- c(rep(0, nrow(df_2017_men)),
                            rep(1, nrow(test_framingham_men)))
   
   mod_weight_sim_men <- glm(S ~ log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+
@@ -748,9 +745,9 @@ for (i in 1:1000) {
   bootstrap_sample_sd_women[i,] <- apply(bootstrap_sample_women[, c(1:3, 7:8)], 2, sd)
   
   # form the new test set
-  full.sim.test.women <- rbind(bootstrap_sample_women[index_test_nhanes_women, ],
+  full.sim.test.women <- rbind(bootstrap_sample_women,
                            test_framingham_women[, 3:12])
-  full.sim.test.women$S <- c(rep(0, length(index_test_nhanes_women)),
+  full.sim.test.women$S <- c(rep(0, nrow(df_2017_women)),
                            rep(1, nrow(test_framingham_women)))
   
   mod_weight_sim_women <- glm(S ~ log(HDLC)+log(TOTCHOL)+log(AGE)+log(SYSBP_UT+1)+
@@ -763,7 +760,7 @@ for (i in 1:1000) {
 }
 ```
 
-```{r}
+```{r marginal_not_used}
 # marginal simulation - not used as performance too bad
 # get_marginal_sample <- function(n, target_mean, target_sd){
 #   
@@ -831,6 +828,9 @@ df_statistics_women[, 5] <- round(target_mean_women, 2)
 df_statistics_women[, 6] <- round(target_sd_women, 2)
 df_statistics_women <- as.data.frame(df_statistics_women)
 rownames(df_statistics_women) <- names(target_mean_women)
+
+saveRDS(df_statistics_men, "df_statistics_men.RDS")
+saveRDS(df_statistics_women, "df_statistics_women.RDS")
 ```
 
 ```{r, include = TRUE}
@@ -857,7 +857,7 @@ df_statistics_women %>%
                      "Actual" = 2))
 ```
 
-For calibration, we compares the distribution of the summary statistics for both methods after 1000 simulations with NHANES (Table 5 and 6). We see the mean values from multivariate normal method are pretty close to the values given, especially for binary variables since the values are specified based on quantiles. However, the standard deviation is deviated probably because we use the covariance matrix from Framingham for approximation. The bootstrap method has a worse calibration for both mean and standard deviation. Standard deviation is underestiamted tha the actual NHANES data probably because we bootstrap samples from Framingham.
+For calibration, we compares the distribution of the summary statistics for both methods after 1000 simulations with NHANES (Table 5 and 6). We see the mean values from multivariate normal method are pretty close to the values given, especially for binary variables since the values are specified based on quantiles. However, the standard deviation is deviated probably because we use the covariance matrix from Framingham for approximation. The bootstrap method has a worse calibration for both mean and standard deviation. Standard deviation is underestimated than the actual NHANES data probably because we bootstrap samples from Framingham.
 
 ```{r, eval=FALSE}
 # Performance
@@ -876,8 +876,7 @@ df_performance[2, 2] <- paste0(
   round((mean(bootstrap_BS_men) - mean(brier_nhanes_men))/mean(brier_nhanes_men)*100, 2), 
   "%")
 df_performance[3, 1] <- paste0(
-  round(mean( (MN_BS_men - mean(brier_nhanes_men) )^2), 5), " (",
-  round(sqrt(var( (MN_BS_men - mean(brier_nhanes_men) )^2)/1000), 5), ")")
+  round(mean( (MN_BS_men - mean(brier_nhanes_men) )^2), 5), " (<0.00001)")
 df_performance[3, 2] <- paste0(
   round(mean( (bootstrap_BS_men - mean(brier_nhanes_men) )^2), 5), " (",
   round(sqrt(var( (bootstrap_BS_men - mean(brier_nhanes_men) )^2)/1000), 5), ")")
@@ -904,6 +903,7 @@ df_performance[3, 4] <- paste0(
 options(scipen=0)
 
 rownames(df_performance) <- c("Bias", "Relative Bias", "MSE")
+saveRDS(df_performance, "df_performance.RDS")
 ```
 
 ```{r, include = TRUE}
@@ -918,7 +918,7 @@ df_performance %>%
 
 ```
 
-Table 7 shows the performance metrics of two methods for men and women, and relative bias is used since brier score is pretty small. The mean brier scores of multivariate normal method are 0.10547 and 0.05544 for men and women, and the ones of bootstrap is 0.12912 and 0.05553 for men and women. Compared to the oracle estimate from NHANES data, the bias is more than 10% for both methods in men, and the bootstrap has a higher bias and MSE than multivariate normal while it has a smaller Monte Carlo SE. For women, both methods perform well while bootstrap has a slightly smaller bias and Monte Carlo SE, and thus a smaller MSE.
+Table 7 shows the performance metrics of two methods for men and women, and relative bias is used since brier score is pretty small. The mean brier scores of multivariate normal method are 0.09779 and 0.05466 for men and women, and the ones of bootstrap is 0.13130 and 0.05498 for men and women. Compared to the oracle estimate from NHANES data, the bias is more than 8% for both methods in men, and the bootstrap has a higher bias and MSE than multivariate normal while it has a smaller Monte Carlo SE. For women, both methods result in a relative bias higher than 15% while bootstrap has a slightly smaller Monte Carlo SE, and thus a smaller MSE.
 
 ## Discussion
 
@@ -936,7 +936,7 @@ For future direction, we can conduct a comprehensive simulation study that we si
 
 ## Conclusion
 
-In our study, we estimate the performance if we transported a prediction model on Framingham data for CVD risk to the target population NHANES, where the outcome is not available. The data is train-test split and stratified by sex, and multiple imputation is conducted to generate complete data. The brier score is calculated for 5 imputed sets, and the average is 0.0929 and 0.0563 in NHANES for men and women, compared to 0.1939 and 0.1171 for Framingham. We also simulate NHANES data based on the summary statistics by multivariate normal and bootstrap methods. The multivariate normal performs better for men, while the bootstrap performs slightly better for women. The difference in the oracle and the simulated brier score seems to be associated with the difference in the source and the target brier score.
+In our study, we estimate the performance if we transported a prediction model on Framingham data for CVD risk to the target population NHANES, where the outcome is not available. The data is train-test split and stratified by sex, and multiple imputation is conducted to generate complete data. The brier score is calculated for 5 imputed sets, and the average is 0.0903 and 0.0474 in NHANES for men and women, compared to 0.1939 and 0.1171 for Framingham. We also simulate NHANES data based on the summary statistics by multivariate normal and bootstrap methods. The multivariate normal performs better for men, while the bootstrap performs slightly better for women. The difference in the oracle and the simulated brier score seems to be associated with the difference in the source and the target brier score.
 
 \newpage
 
