@@ -10,8 +10,54 @@ Evaluating the transportability and the performance is important when applying a
 
 ## Main Results
 
-|  | Men || Women ||
-| | MN | BS| MN | BS| 
+<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;}
+.tg td{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg th{border-color:black;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+  font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+.tg .tg-baqh{text-align:center;vertical-align:top}
+.tg .tg-nrix{text-align:center;vertical-align:middle}
+</style>
+<table class="tg">
+<thead>
+  <tr>
+    <th class="tg-baqh"></th>
+    <th class="tg-baqh" colspan="2">Men</th>
+    <th class="tg-baqh" colspan="2">Women</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td class="tg-baqh"></td>
+    <td class="tg-baqh">Multivariate<br>Normal</td>
+    <td class="tg-nrix">Bootstrap</td>
+    <td class="tg-baqh">Multivariate<br>Normal</td>
+    <td class="tg-nrix">Bootstrap</td>
+  </tr>
+  <tr>
+    <td class="tg-baqh">Bias</td>
+    <td class="tg-baqh">0.00753 (0.00016)<br></td>
+    <td class="tg-baqh">0.04105 (0.00009)</td>
+    <td class="tg-baqh">0.00721 (0.00012) </td>
+    <td class="tg-baqh">0.00753 (0.00006)</td>
+  </tr>
+  <tr>
+    <td class="tg-baqh">Relative Bias</td>
+    <td class="tg-baqh">8.34%</td>
+    <td class="tg-baqh">45.48%</td>
+    <td class="tg-baqh">15.2%</td>
+    <td class="tg-baqh">15.88%</td>
+  </tr>
+  <tr>
+    <td class="tg-baqh">MSE</td>
+    <td class="tg-baqh">0.00008 (&lt;0.00001)</td>
+    <td class="tg-baqh">0.00169 (0.00001)</td>
+    <td class="tg-baqh">0.00007 (&lt;0.00001)</td>
+    <td class="tg-baqh">0.00006 (&lt;0.00001)</td>
+  </tr>
+</tbody>
+</table>
 [Performance comparison for two simulation methods]
 
 ## Package
