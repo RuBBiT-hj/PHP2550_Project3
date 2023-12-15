@@ -34,7 +34,7 @@ Besides the prediction accuracy, the ability to generalize is also an important 
 
 Recently, a method that can estimates the performance of transporting a prediction model in a new target population has been published [@Steingrimsson2023-og]. This methods uses inverse-odds weights based on the covariates to account for the differences in the characteristic distributions of the source and the tartget population. It doesn't require the outcome to be available in the target population, and it provides an estimate of brier scores by a weighted average of the brier scores components from the source population.
 
-In this study, we implement this method to transport the prediction model from Framingham Heart Study to the National Health and Nutrition Examination Survey (NHANES) data. In addition, we consider a realistic scenario that only summary statistics from NHANES data is available. We simulate individual data based on the summary statistics, and we evaluate the performance of transporting the prediction model compared to the oracle estiamte when the individual-level data is available.
+In this study, we implement this method to transport the prediction model from Framingham Heart Study to the National Health and Nutrition Examination Survey (NHANES) data. In addition, we consider a realistic scenario that only summary statistics from NHANES data is available. We simulate individual data based on the summary statistics, and we evaluate the performance of transporting the prediction model compared to the oracle estimate when the individual-level data is available.
 
 ## Methods
 
